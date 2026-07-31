@@ -15,7 +15,7 @@ from openai import OpenAI
 # DeepSeek API 配置
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 # LLM 角色设定：五音理论作曲专家
 SYSTEM_PROMPT = """你是一位精通中国传统五音理论（宫商角徵羽）和五行学说的作曲专家。
