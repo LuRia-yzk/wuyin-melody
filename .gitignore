@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 环境变量（含API key）
+.env
+.env.local
+
+# 生成的音乐文件
+*.mid
+*.wav
+*.mp3
+*.sf2
+output/
+
+# 系统
+.DS_Store
+Thumbs.db
