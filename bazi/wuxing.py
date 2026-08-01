@@ -103,7 +103,8 @@ class WuxingAnalyzer:
             # 需要生我和同我的
             return BEI_SHENG[ri_wx], ri_wx
         else:
-            return None, None
+            # 平衡：以同我(日主自身五行)固本，辅以生我(印星)滋养
+            return ri_wx, BEI_SHENG[ri_wx]
 
     def recommend_yinyue(self):
         """根据五行需求推荐五音调式"""

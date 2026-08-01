@@ -134,6 +134,15 @@ class TestWuxing:
         assert 'primary_mode' in rec
         assert rec['primary_mode'] in ('gong', 'shang', 'jue', 'zhi', 'yu')
 
+    def test_balanced_mode_not_null(self):
+        """平衡命局的推荐调式和五行不应为 None（回归测试）"""
+        bazi = BaZiEngine(1995, 8, 3, 10, 'female')
+        rec = bazi.wuxing.recommend_yinyue()
+        assert rec['day_master_strength'] == '平衡'
+        assert rec['primary_wuxing'] is not None
+        assert rec['secondary_wuxing'] is not None
+        assert rec['primary_mode'] in ('gong', 'shang', 'jue', 'zhi', 'yu')
+
 
 class TestShishen:
     """十神测试"""

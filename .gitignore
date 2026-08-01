@@ -16,6 +16,9 @@ venv/
 *.sf2
 output/
 
+# FluidSynth 二进制（需手动下载，不入库）
+tools/
+
 # 系统
 .DS_Store
 Thumbs.db

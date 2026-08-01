@@ -15,17 +15,19 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from bazi.bazi_engine import BaZiEngine
-from music.melody import MelodyGenerator, PENTATONIC_SCALES
+from music.melody import MelodyGenerator
 
 # ========== 状态定义 ==========
 class WorkflowState(TypedDict):
     """工作流状态"""
     birth_input: dict          # 用户输入的出生信息
     bazi_info: Optional[str]   # 八字分析结果（结构化文本）
+    fate_analysis: str         # 命理分析师的中文解读
     recommended_mode: str      # 推荐的调式
     melody_prompt: str         # LLM生成的旋律描述
     melody_notes: list         # LLM生成的音符序列
     output_path: str           # 输出的MIDI文件路径
+    output_wav: str            # 渲染后的WAV音频路径
     explanation: str           # 给用户的解读
 
 # ========== 节点1: 八字分析（Python引擎，精确计算）==========
@@ -60,71 +62,65 @@ def analyze_bazi_node(state: WorkflowState) -> dict:
         "recommended_mode": rec['primary_mode'],
     }
 
-# ========== 节点2: 旋律生成（LLM Agent，创造性创作）==========
+# ========== 节点2: 命理分析（LLM Agent，人性化解读）==========
+def analyze_fate_node(state: WorkflowState) -> dict:
+    """
+    让LLM（DeepSeek）扮演命理分析师，将八字JSON转为有温度的中文解读。
+    """
+    from agents.fate_analyst import analyze_fate_with_llm
+
+    bazi_info = state.get("bazi_info", "")
+
+    # 调用DeepSeek进行命理解读（失败时自动降级为规则解读）
+    fate_analysis = analyze_fate_with_llm(bazi_info)
+
+    return {
+        "fate_analysis": fate_analysis,
+    }
+
+# ========== 节点3: 旋律生成（LLM Agent，创造性创作）==========
 def generate_melody_node(state: WorkflowState) -> dict:
     """
-    让LLM（DeepSeek）根据八字分析结果创作旋律。
+    让LLM（DeepSeek）根据命理解读和八字分析创作旋律。
     """
     from agents.melody_agent import generate_melody_with_llm
 
     mode = state.get("recommended_mode", "yu")
     bazi_info = state.get("bazi_info", "")
+    fate_analysis = state.get("fate_analysis", "")
 
-    # 调用DeepSeek创作旋律（失败时自动降级为默认旋律）
-    melody_notes = generate_melody_with_llm(bazi_info, mode)
+    # 把命理解读和八字数据一起传给音乐创作大师
+    combined_info = f"【八字数据】\n{bazi_info}\n\n【命理分析师的解读】\n{fate_analysis}"
+    melody_notes = generate_melody_with_llm(combined_info, mode)
 
     return {
-        "melody_prompt": f"根据以下八字分析创作{mode}调五音疗愈旋律:\n{bazi_info}",
+        "melody_prompt": f"根据以下命理分析创作{mode}调五音疗愈旋律:\n{combined_info}",
         "melody_notes": melody_notes,
     }
 
 # ========== 节点3: 渲染（Python，输出音频）==========
 def render_music_node(state: WorkflowState) -> dict:
-    """将音符序列渲染为MIDI文件"""
+    """将音符序列渲染为MIDI文件，并用FluidSynth渲染成WAV音频"""
     mode = state["recommended_mode"]
     melody_notes = state["melody_notes"]
 
-    # 构建完整MIDI
-    from midiutil import MIDIFile
+    # 复用 MelodyGenerator 生成 MIDI（避免重复的MIDI构建逻辑）
+    from music.melody import MelodyGenerator
+    generator = MelodyGenerator(mode=mode, bpm=55)
 
-    midi = MIDIFile(2)
-    midi.addTrackName(0, 0, 'guqin')
-    midi.addTempo(0, 0, 55)
-    midi.addProgramChange(0, 0, 0, 107)  # Koto
+    output_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "melody.mid")
 
-    midi.addTrackName(1, 0, 'pad')
-    midi.addTempo(1, 0, 55)
-    midi.addProgramChange(1, 0, 0, 89)
+    generator.generate_from_notes(melody_notes, output_path)
 
-    scale = PENTATONIC_SCALES[mode]
-    note_duration = 60 / 55
-
-    # 主旋律
-    beat = 0
-    for note in melody_notes:
-        if len(note) == 2:
-            scale_idx, beats = note
-            velocity = 60
-        else:
-            scale_idx, beats, velocity = note
-        pitch = scale[scale_idx % len(scale)] + (0 if scale_idx < len(scale) else 12)
-        t = beat * note_duration
-        dur = beats * note_duration
-        midi.addNote(0, 0, pitch, t, dur, velocity)
-        beat += beats
-
-    # 简单pad铺底
-    pad_pitch = scale[0]
-    midi.addNote(1, 0, pad_pitch, 0, beat * note_duration, 25)
-
-    output_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "melody.mid")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, 'wb') as f:
-        midi.writeFile(f)
+    # 用 FluidSynth 将 MIDI 渲染为 WAV
+    from music.render import render_midi_to_wav
+    output_wav = render_midi_to_wav(output_path)
 
     return {
         "output_path": output_path,
+        "output_wav": output_wav,
         "explanation": f"已为你生成{mode}调五音疗愈音乐，基于你的八字五行分析。"
     }
 
@@ -135,12 +131,14 @@ def build_workflow():
 
     # 添加节点
     workflow.add_node("analyze_bazi", analyze_bazi_node)
+    workflow.add_node("analyze_fate", analyze_fate_node)
     workflow.add_node("generate_melody", generate_melody_node)
     workflow.add_node("render_music", render_music_node)
 
     # 设置入口和连线
     workflow.set_entry_point("analyze_bazi")
-    workflow.add_edge("analyze_bazi", "generate_melody")
+    workflow.add_edge("analyze_bazi", "analyze_fate")
+    workflow.add_edge("analyze_fate", "generate_melody")
     workflow.add_edge("generate_melody", "render_music")
     workflow.add_edge("render_music", END)
 
@@ -161,9 +159,13 @@ if __name__ == "__main__":
     print("=== 八字分析 ===")
     print(result["bazi_info"])
     print()
+    print("=== 命理分析师的解读 ===")
+    print(result.get("fate_analysis", "（无）"))
+    print()
     print("=== 推荐调式 ===")
     print(result["recommended_mode"])
     print()
     print("=== 输出 ===")
-    print(result["output_path"])
+    print("MIDI:", result["output_path"])
+    print("WAV:", result.get("output_wav", "渲染失败"))
     print(result["explanation"])

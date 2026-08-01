@@ -26,14 +26,26 @@ pip install -r requirements.txt
 
 ## 快速开始
 
+```bash
+# CLI交互：输入出生时间，自动生成专属五音疗愈音乐（WAV）
+python cli.py
+
+# 或直接指定参数
+python cli.py --year 1988 --month 10 --day 15 --hour 6 --gender male
+```
+
+### 编程方式
+
 ```python
 from bazi.bazi_engine import BaZiEngine
 from music.melody import MelodyGenerator
+from music.render import render_midi_to_wav
 
 bazi = BaZiEngine(year=1988, month=10, day=15, hour=6, gender='male')
 mode = bazi.recommend_mode()
 generator = MelodyGenerator(mode=mode)
 generator.generate("output.mid")
+render_midi_to_wav("output.mid")  # 渲染为WAV
 ```
 
 ## 许可
