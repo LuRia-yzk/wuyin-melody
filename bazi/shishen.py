@@ -1,8 +1,8 @@
 """
 十神分析器
-以日干为"我"，分析其他天干的十神关系
+以日干为"我"，分析天干及地支藏干的十神关系
 """
-from .constants import GAN_WUXING, GAN_YINYANG, SHENG, KE, BEI_SHENG, BEI_KE
+from .constants import GAN_WUXING, GAN_YINYANG, SHENG, KE, BEI_SHENG, BEI_KE, ZHI_CANGGAN
 
 # 关系定义：(五行关系, 阴阳关系) → 十神名
 # 五行关系: '同','生我','我生','克我','我克'
@@ -56,7 +56,7 @@ class ShishenAnalyzer:
         return SHISHEN_TABLE.get((wx_rel, yy_rel), '未知')
 
     def all_tiangan(self):
-        """返回四柱天干的十神"""
+        """返回四柱天干的十神（透干）"""
         labels = ['年干', '月干', '日干', '时干']
         fields = ['nian_gan', 'yue_gan', 'ri_gan', 'shi_gan']
         result = {}
@@ -67,3 +67,30 @@ class ShishenAnalyzer:
             else:
                 result[label] = self.get_relationship(gan)
         return result
+
+    def all_dizhi(self):
+        """返回四柱地支藏干的十神
+
+        地支藏干包含本气、中气、余气，每个藏干都算一个十神。
+        返回结构:
+            {
+                '年支': [('藏干名', '十神'), ...],
+                ...
+            }
+        """
+        labels = ['年支', '月支', '日支', '时支']
+        fields = ['nian_zhi', 'yue_zhi', 'ri_zhi', 'shi_zhi']
+        result = {}
+        for label, field in zip(labels, fields):
+            zhi = getattr(self.bazi, field)
+            # ZHI_CANGGAN 返回 [(藏干, 五行), ...]
+            hidden = ZHI_CANGGAN[zhi]
+            result[label] = [(gan, self.get_relationship(gan)) for gan, _ in hidden]
+        return result
+
+    def summary(self):
+        """汇总全部十神（透干+藏干），便于完整展示"""
+        return {
+            '天干': self.all_tiangan(),
+            '地支藏干': self.all_dizhi(),
+        }

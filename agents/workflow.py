@@ -1,12 +1,17 @@
 """
 五音乐章 LangGraph 工作流
 
-用户输入出生时间 → 节点1: 八字分析(Python引擎) → 节点2: 旋律生成(LLM Agent) → 节点3: 渲染(Python)
+用户输入出生时间 → 节点1: 八字分析(Python引擎) → 节点2: 命理解读(LLM) → 节点3: 旋律生成(LLM) → 节点4: 渲染(Python)
 """
 import json
 import os
 import sys
 from typing import TypedDict, Optional
+
+from dotenv import load_dotenv
+
+# 加载 .env 中的 API key
+load_dotenv()
 
 # 确保能导入项目模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,8 +47,9 @@ def analyze_bazi_node(state: WorkflowState) -> dict:
     strength = wx.day_master_strength()
     rec = wx.recommend_yinyue()
 
-    # 十神
-    shishen = bazi.shishen.all_tiangan()
+    # 十神（透干 + 地支藏干）
+    shishen_tg = bazi.shishen.all_tiangan()
+    shishen_dz = bazi.shishen.all_dizhi()
 
     bazi_info = {
         "八字": f"{bazi.nian_gan}{bazi.nian_zhi} {bazi.yue_gan}{bazi.yue_zhi} {bazi.ri_gan}{bazi.ri_zhi} {bazi.shi_gan}{bazi.shi_zhi}",
@@ -54,7 +60,8 @@ def analyze_bazi_node(state: WorkflowState) -> dict:
         "推荐主调五行": rec['primary_wuxing'],
         "推荐辅调": rec['secondary_mode'],
         "推荐辅调五行": rec['secondary_wuxing'],
-        "十神": shishen,
+        "十神(透干)": shishen_tg,
+        "十神(藏干)": shishen_dz,
     }
 
     return {

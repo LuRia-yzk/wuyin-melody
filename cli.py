@@ -16,6 +16,11 @@ import argparse
 import os
 import sys
 
+from dotenv import load_dotenv
+
+# 加载 .env 中的 API key（DEEPSEEK_API_KEY 等）
+load_dotenv()
+
 # Windows 下强制 UTF-8 输出（解决 GBK 乱码）
 if sys.platform == 'win32':
     try:
@@ -82,6 +87,43 @@ def input_birth() -> dict:
     return {'year': year, 'month': month, 'day': day, 'hour': hour, 'gender': gender}
 
 
+def _print_bazi_info(bazi_info_str: str):
+    """将八字信息JSON转为友好格式展示"""
+    import json
+    try:
+        info = json.loads(bazi_info_str)
+    except json.JSONDecodeError:
+        print(bazi_info_str)
+        return
+
+    print("  八字:  " + info.get("八字", ""))
+    print("  日主:  " + info.get("日主", ""))
+    print("  日主强弱: " + info.get("日主强弱", ""))
+    print("  五行分布: " + ", ".join(f"{k}{v:.1f}" for k, v in info.get("五行分布", {}).items()))
+
+    rec = f"主调 {info.get('推荐主调', '')}"
+    if info.get("推荐主调五行"):
+        rec += f"({info['推荐主调五行']})"
+    rec += f" + 辅调 {info.get('推荐辅调', '')}"
+    if info.get("推荐辅调五行"):
+        rec += f"({info['推荐辅调五行']})"
+    print("  推荐调式: " + rec)
+
+    # 十神展示
+    shishen_tg = info.get("十神(透干)", {})
+    shishen_dz = info.get("十神(藏干)", {})
+    print("  十神(透干): " + ", ".join(f"{k}{v}" for k, v in shishen_tg.items()))
+
+    zhi_names = {'年支': '年支', '月支': '月支', '日支': '日支', '时支': '时支'}
+    if shishen_dz:
+        parts = []
+        for label in ['年支', '月支', '日支', '时支']:
+            hidden = shishen_dz.get(label, [])
+            names = [ss for _, ss in hidden]
+            parts.append(f"{label}藏[{','.join(names)}]")
+        print("  十神(藏干): " + "  ".join(parts))
+
+
 def run_flow(birth: dict):
     """运行完整工作流并输出结果"""
     print()
@@ -93,7 +135,7 @@ def run_flow(birth: dict):
 
     print()
     print("【八字排盘】")
-    print(result["bazi_info"])
+    _print_bazi_info(result["bazi_info"])
     print()
     print("【命理分析师解读】")
     print(result.get("fate_analysis", "（无）"))

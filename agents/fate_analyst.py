@@ -10,7 +10,11 @@ LLM扮演"资深命理分析师"，把冷冰冰的八字 JSON 数据，
 import json
 import os
 
+from dotenv import load_dotenv
 from openai import OpenAI
+
+# 加载 .env 中的 API key（兼容直接运行本模块的场景）
+load_dotenv()
 
 # DeepSeek API 配置（与 melody_agent.py 保持一致）
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
