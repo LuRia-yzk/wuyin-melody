@@ -88,26 +88,35 @@ def generate_melody_with_llm(bazi_info_json: str, mode: str) -> list:
 
     prompt = create_melody_prompt(bazi_info_json, mode)
 
-    try:
-        response = client.chat.completions.create(
-            model=DEEPSEEK_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.8,  # 创作任务，温度略高
-            max_tokens=2000,
-        )
+    # 尝试最多3次（JSON Mode + 重试处理空内容问题）
+    for attempt in range(3):
+        try:
+            response = client.chat.completions.create(
+                model=DEEPSEEK_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.8,  # 创作任务，温度略高
+                max_tokens=2000,
+                response_format={'type': 'json_object'},  # JSON Mode: 提高格式稳定性
+            )
 
-        content = response.choices[0].message.content
-        notes = _parse_llm_response(content)
-        if notes:
-            return notes
-        return _fallback_melody()
+            content = response.choices[0].message.content
+            if not content or not content.strip():
+                print(f"[重试] 第{attempt+1}次返回空内容，重试中...")
+                continue
 
-    except Exception as e:
-        print(f"[错误] LLM调用失败: {e}")
-        return _fallback_melody()
+            notes = _parse_llm_response(content)
+            if notes:
+                return notes
+            print(f"[重试] 第{attempt+1}次未能解析出音符，重试中...")
+
+        except Exception as e:
+            print(f"[重试] 第{attempt+1}次调用异常: {e}")
+
+    print("[警告] 多次尝试失败，使用默认旋律")
+    return _fallback_melody()
 
 
 def _parse_llm_response(content: str) -> list:
