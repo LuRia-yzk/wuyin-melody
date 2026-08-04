@@ -1,6 +1,6 @@
 """
 五行强度分析器
-判断日主强弱，推荐需要的五行 → 对应五音调式
+判断日主强弱，推荐喜用神 → 对应五音调式
 """
 from .constants import (
     GAN_WUXING, ZHI_WUXING, ZHI_CANGGAN,
@@ -12,6 +12,10 @@ WUYIN_TO_WUXING = {
     'gong': '土', 'shang': '金', 'jue': '木',
     'zhi': '火', 'yu': '水',
 }
+
+# 季节 → 月支（用于调候判断）
+WINTER_ZHI = {'亥', '子', '丑'}   # 冬：需火暖局
+SUMMER_ZHI = {'巳', '午', '未'}   # 夏：需水润局
 
 
 class WuxingAnalyzer:
@@ -50,7 +54,7 @@ class WuxingAnalyzer:
         return counts
 
     def day_master_strength(self):
-        """判断日主强弱"""
+        """判断日主强弱（计分法）"""
         ri_gan = self.bazi.rizhu
         ri_wx = GAN_WUXING[ri_gan]
         yue_zhi = self.bazi.yue_zhi
@@ -91,7 +95,7 @@ class WuxingAnalyzer:
             return '弱'
 
     def recommend_wuxing(self):
-        """推荐需要补充的五行"""
+        """推荐需要补充的五行（扶抑法：依日主强弱取喜用神）"""
         ri_gan = self.bazi.rizhu
         ri_wx = GAN_WUXING[ri_gan]
         strength = self.day_master_strength()
@@ -105,6 +109,60 @@ class WuxingAnalyzer:
         else:
             # 平衡：以同我(日主自身五行)固本，辅以生我(印星)滋养
             return ri_wx, BEI_SHENG[ri_wx]
+
+    def season(self):
+        """出生季节（按月支）"""
+        zhi = self.bazi.yue_zhi
+        if zhi in WINTER_ZHI:
+            return '冬'
+        if zhi in SUMMER_ZHI:
+            return '夏'
+        if zhi in {'寅', '卯', '辰'}:
+            return '春'
+        return '秋'
+
+    def diao_hou(self):
+        """调候需要（寒暖燥湿）：冬需火暖局，夏需水润局。
+
+        返回: 调候需要的五行，或 None
+        """
+        season = self.season()
+        if season == '冬':
+            return '火'
+        if season == '夏':
+            return '水'
+        return None
+
+    def xiyong_shen(self):
+        """完整喜用神分析：扶抑 + 调候。
+
+        返回 {喜用神: [...], 调候: 五行或None, 说明: str}
+        """
+        primary, secondary = self.recommend_wuxing()
+        strength = self.day_master_strength()
+        xiyong = [primary, secondary]
+
+        # 去重
+        seen = set()
+        xiyong = [x for x in xiyong if not (x in seen or seen.add(x))]
+
+        # 调候补充
+        diao = self.diao_hou()
+        explanation = f"日主{self.bazi.rizhu}（{GAN_WUXING[self.bazi.rizhu]}），命局{strength}"
+        if diao:
+            if diao not in xiyong:
+                xiyong.append(diao)
+                explanation += f"，生于{self.season()}季，调候上宜补{diao}"
+            else:
+                explanation += f"，生于{self.season()}季，{diao}兼顾调候"
+        else:
+            explanation += "，以扶抑取用"
+
+        return {
+            '喜用神': xiyong,
+            '调候': diao,
+            '说明': explanation,
+        }
 
     def recommend_yinyue(self):
         """根据五行需求推荐五音调式"""

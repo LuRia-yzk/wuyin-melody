@@ -5,13 +5,29 @@
 from midiutil import MIDIFile
 
 # 五音调式音阶（MIDI音高编号）
-# 以A3=69为基准，五声音阶各调式
+# 传统五音以"宫=C"为基准，五声调式全部用自然音（无升降号），LLM 生成 ABC 友好
 PENTATONIC_SCALES = {
-    'gong': [69, 71, 73, 76, 78, 81],     # 宫调 do re mi sol la (C)
-    'shang': [71, 73, 76, 78, 81, 83],    # 商调 re mi sol la do (D)
-    'jue': [73, 76, 78, 81, 83, 85],      # 角调 mi sol la do re (E)
-    'zhi': [76, 78, 81, 83, 85, 88],      # 徵调 sol la do re mi (G)
-    'yu': [69, 72, 74, 76, 79, 81],       # 羽调 la do re mi sol (A)
+    'gong': [60, 62, 64, 67, 69, 72],     # 宫调 do re mi sol la (C D E G A)
+    'shang': [62, 64, 67, 69, 72, 74],    # 商调 re mi sol la do (D E G A C)
+    'jue': [64, 67, 69, 72, 74, 76],      # 角调 mi sol la do re (E G A C D)
+    'zhi': [67, 69, 72, 74, 76, 79],      # 徵调 sol la do re mi (G A C D E)
+    'yu': [69, 72, 74, 76, 79, 81],       # 羽调 la do re mi sol (A C D E G)
+}
+
+# 五音调式 → ABC 音名，供 LLM 生成 ABC 乐谱
+# 注意 music21 的 ABC 八度约定：大写字母=C4 起（MIDI 60），小写字母=C5 起（MIDI 72）。
+# 因此下列音名渲染出的实际音高与 PENTATONIC_SCALES 完全一致（古琴最佳音域 60-81）。
+WUYIN_ABC_SCALES = {
+    'gong': ['C', 'D', 'E', 'G', 'A', 'c'],      # C4 D4 E4 G4 A4 C5
+    'shang': ['D', 'E', 'G', 'A', 'c', 'd'],     # D4 E4 G4 A4 C5 D5
+    'jue': ['E', 'G', 'A', 'c', 'd', 'e'],       # E4 G4 A4 C5 D5 E5
+    'zhi': ['G', 'A', 'c', 'd', 'e', 'g'],       # G4 A4 C5 D5 E5 G5
+    'yu': ['A', 'c', 'd', 'e', 'g', 'a'],        # A4 C5 D5 E5 G5 A5
+}
+
+# 五音调式 → 主音 ABC 音名
+WUYIN_ABC_TONIC = {
+    'gong': 'C', 'shang': 'D', 'jue': 'E', 'zhi': 'G', 'yu': 'A',
 }
 
 # 低八度扩展

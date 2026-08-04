@@ -1,172 +1,152 @@
 """
-八字排盘引擎
-计算四柱（年柱、月柱、日柱、时柱）+ 大运
+八字排盘引擎 v2
+=============================
+基于 lunar-python 的天文计算底座，提供完整精确的排盘数据。
+
+设计：
+- 天文计算（节气精确到秒、立春边界、大运流年、纳音、胎元命宫身宫等）交给 lunar-python
+- 自研层：真太阳时修正、神煞、五行强弱、用神、格局、五音调式推荐
+
+用法：
+    from bazi.bazi_engine import BaZiChart
+    chart = BaZiChart(1988, 10, 15, 6, gender='male')
+    print(chart.to_dict())          # 完整排盘数据
+    print(chart.wuxing.recommend_yinyue())  # 调式推荐
 """
-from datetime import date
+import math
+from datetime import datetime
+
+from lunar_python import Solar
 
 from .wuxing import WuxingAnalyzer
 from .shishen import ShishenAnalyzer
-from .constants import (
-    TIAN_GAN, DI_ZHI, WUHU_DUN, WUSHU_DUN,
-    JIEQI_MONTHS, HOUR_TO_ZHI,
-)
+from .shensha import ShenShaAnalyzer
+from .geju import GejuAnalyzer
+from .constants import TIAN_GAN, DI_ZHI, GAN_WUXING, ZHI_CANGGAN
+
+# 四柱干支标签
+_PILLAR_LABELS = {
+    'year': ('nian', '年'),
+    'month': ('yue', '月'),
+    'day': ('ri', '日'),
+    'time': ('shi', '时'),
+}
 
 
-def _date_between(birth, start, end):
-    """判断birth日期是否在start和end之间（循环时间轴，处理跨年）"""
-    bm, bd = birth
-    sm, sd = start
-    em, ed = end
+def equation_of_time_minutes(day_of_year: int) -> float:
+    """均时差（分钟），标准近似公式。
 
-    def key(m, d):
-        """转为可比较的天数（假设平年，用于跨节气比较）"""
-        month_days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        return sum(month_days[:m - 1]) + d
+    Args:
+        day_of_year: 年中第几天（1-366）
 
-    bk, sk, ek = key(bm, bd), key(sm, sd), key(em, ed)
-
-    if sk <= ek:
-        # 同一年内
-        return sk <= bk < ek
-    else:
-        # 跨年（如大雪→小寒）：分两段
-        year_days = 365
-        return sk <= bk or bk < ek
-
-def _get_wuhu(gan):
-    """查找五虎遁起始天干序号"""
-    for (g1, g2), v in WUHU_DUN.items():
-        if gan in (g1, g2):
-            return v
-    return 0
-
-def _get_wushu(gan):
-    """查找五鼠遁起始天干序号"""
-    for (g1, g2), v in WUSHU_DUN.items():
-        if gan in (g1, g2):
-            return v
-    return 0
+    Returns:
+        均时差分钟数（约 -16 ~ +16）
+    """
+    b = 360.0 / 365 * (day_of_year - 81)  # 度
+    return (
+        9.87 * math.sin(math.radians(2 * b))
+        - 7.53 * math.cos(math.radians(b))
+        - 1.5 * math.sin(math.radians(b))
+    )
 
 
-class BaZiEngine:
-    """八字排盘引擎"""
+def true_solar_time(year, month, day, hour, minute, longitude) -> tuple:
+    """真太阳时修正。
 
-    def __init__(self, year, month, day, hour, gender='male'):
+    真太阳时 = 地方平太阳时 + 均时差
+    地方平太阳时 = 北京时间 + (出生地经度 - 120°) × 4分钟
+
+    Args:
+        longitude: 出生地经度（东经正值，如成都 104.07，北京 116.4）
+
+    Returns:
+        (修正后小时, 修正后分钟)
+    """
+    if longitude is None:
+        return hour, minute
+
+    # 地方平太阳时
+    total_minutes = hour * 60 + minute + (longitude - 120) * 4
+    # 加均时差
+    day_of_year = datetime(year, month, day).timetuple().tm_yday
+    total_minutes += equation_of_time_minutes(day_of_year)
+
+    total_minutes %= 24 * 60
+    return int(total_minutes // 60), int(total_minutes % 60)
+
+
+class BaZiChart:
+    """八字命盘：包装 lunar-python 的完整排盘数据。
+
+    兼容旧 BaZiEngine 的属性（nian_gan/nian_zhi/.../rizhu/pillars），
+    使已验证的 WuxingAnalyzer / ShishenAnalyzer 无需改动即可复用。
+    """
+
+    def __init__(self, year, month, day, hour, minute=0, gender='male',
+                 longitude=None, sect=1):
         self.year = year
         self.month = month
         self.day = day
         self.hour = hour
+        self.minute = minute
         self.gender = gender
+        self.gender_num = 1 if gender == 'male' else 0
+        self.longitude = longitude
+        self.sect = sect
 
-        self.nian_gan = None
-        self.nian_zhi = None
-        self.yue_gan = None
-        self.yue_zhi = None
-        self.ri_gan = None
-        self.ri_zhi = None
-        self.shi_gan = None
-        self.shi_zhi = None
+        # 真太阳时修正（影响时辰判定）
+        corr_h, corr_m = true_solar_time(year, month, day, hour, minute, longitude)
+        self.true_hour = corr_h
+        self.true_minute = corr_m
 
-        # 计算四柱
-        self._calc_nian()
-        self._calc_yue()
-        self._calc_ri()
-        self._calc_shi()
+        self.solar = Solar.fromYmdHms(year, month, day, corr_h, corr_m, 0)
+        self.lunar = self.solar.getLunar()
+        self.ec = self.lunar.getEightChar()
+        self.ec.setSect(sect)  # 子时流派：1=晚子时日柱算当天，2=算明天
 
-        # 分析器
+        # 缓存分析器
         self._wuxing = None
         self._shishen = None
+        self._shensha = None
+        self._geju = None
+        self._yun_data = None
 
-    def _calc_nian(self):
-        """年柱：(年-4) mod 10 → 天干, (年-4) mod 12 → 地支"""
-        idx = (self.year - 4) % 10
-        self.nian_gan = TIAN_GAN[idx]
-        idx = (self.year - 4) % 12
-        self.nian_zhi = DI_ZHI[idx]
+    # ========== 四柱干支（兼容旧接口） ==========
+    @property
+    def nian_gan(self):
+        return self.ec.getYear()[0]
 
-    def _calc_yue(self):
-        """月柱：节气定月支 + 五虎遁定月干"""
-        # 确定月支：找出出生日期落在哪个节之后的月
-        # JIEQI_MONTHS: (节名, 月, 日, 地支序号)
-        # 地支序号: 立春=2(寅), 惊蛰=3(卯), ..., 大雪=12(子), 小寒=1(丑)
-        zhi_idx = None
-        # 先把节气按"月"排序，处理跨年（小寒在1月）
-        # 对每个节气，判断出生日期是否在它之后、下一个节气之前
-        jieqi_list = sorted(JIEQI_MONTHS, key=lambda x: (x[1], x[2]))
+    @property
+    def nian_zhi(self):
+        return self.ec.getYear()[1]
 
-        # 简化判断：出生日期 >= 节气的(月,日)，则属于该节气开始的月份
-        for i, (_, jq_m, jq_d, z_idx) in enumerate(jieqi_list):
-            nxt = jieqi_list[(i + 1) % len(jieqi_list)]
-            # 当前节气的日期（跨年处理）
-            cur_date = (jq_m, jq_d)
-            # 下一个节气的日期
-            nxt_m, nxt_d = nxt[1], nxt[2]
+    @property
+    def yue_gan(self):
+        return self.ec.getMonth()[0]
 
-            # 出生日期
-            birth = (self.month, self.day)
+    @property
+    def yue_zhi(self):
+        return self.ec.getMonth()[1]
 
-            # 判断 birth 是否在 cur 和 nxt 之间（循环时间轴）
-            if _date_between(birth, cur_date, (nxt_m, nxt_d)):
-                zhi_idx = z_idx
-                break
+    @property
+    def ri_gan(self):
+        return self.ec.getDay()[0]
 
-        if zhi_idx is None:
-            zhi_idx = 1  # 兜底：丑月
+    @property
+    def ri_zhi(self):
+        return self.ec.getDay()[1]
 
-        # 地支序号转标准：大雪=12 → 子=0
-        zhi_idx_std = zhi_idx % 12
-        self.yue_zhi = DI_ZHI[zhi_idx_std]
+    @property
+    def shi_gan(self):
+        return self.ec.getTime()[0]
 
-        # 五虎遁：从正月(寅=2)开始，年干决定正月天干
-        # 寅月地支序号=2，当前月地支序号=zhi_idx_std
-        # 从正月到当前月的偏移 = (zhi_idx_std - 2) mod 12
-        gan_start = _get_wuhu(self.nian_gan)  # 正月天干序号
-        offset = (zhi_idx_std - 2) % 12
-        self.yue_gan = TIAN_GAN[(gan_start + offset) % 10]
-
-    def _calc_ri(self):
-        """
-        日柱：用1900年1月1日(甲戌日)为基准，计算天数差求干支。
-        这个基准可靠（1900-01-01确认为甲戌日）。
-        """
-        # 基准：1900-01-01 = 甲戌日
-        # 甲=序号0(天干), 戌=序号10(地支)
-        # 六十甲子中甲戌的序号 = 10
-        base_date = date(1900, 1, 1)
-        target_date = date(self.year, self.month, self.day)
-        days_diff = (target_date - base_date).days
-
-        # 甲戌在六十甲子中的序号（甲子=0）
-        GANZHI_BASE_INDEX = 10
-        idx = (GANZHI_BASE_INDEX + days_diff) % 60
-
-        self.ri_gan = TIAN_GAN[idx % 10]
-        self.ri_zhi = DI_ZHI[idx % 12]
-
-    def _calc_shi(self):
-        """时柱：时辰定支 + 五鼠遁定干"""
-        # 确定时支
-        zhi_idx = None
-        for start_h, zi in HOUR_TO_ZHI:
-            h = self.hour
-            if start_h == 23 and (h >= 23 or h < 1):
-                zhi_idx = zi
-                break
-            if h >= start_h and h < start_h + 2:
-                zhi_idx = zi
-                break
-        if zhi_idx is None:
-            zhi_idx = 0  # 默认子时
-
-        self.shi_zhi = DI_ZHI[zhi_idx]
-
-        # 五鼠遁
-        gan_start = _get_wushu(self.ri_gan)
-        self.shi_gan = TIAN_GAN[(gan_start + zhi_idx) % 10]
+    @property
+    def shi_zhi(self):
+        return self.ec.getTime()[1]
 
     @property
     def pillars(self):
-        """返回四柱"""
+        """返回四柱 {柱名: (天干, 地支)}"""
         return {
             '年柱': (self.nian_gan, self.nian_zhi),
             '月柱': (self.yue_gan, self.yue_zhi),
@@ -179,19 +159,243 @@ class BaZiEngine:
         """日主（日干）"""
         return self.ri_gan
 
+    # ========== 分析器（懒加载） ==========
     @property
     def wuxing(self):
-        """五行分析器"""
+        """五行分析器（强弱/用神/调式）"""
         if self._wuxing is None:
             self._wuxing = WuxingAnalyzer(self)
         return self._wuxing
 
     @property
     def shishen(self):
-        """十神分析器"""
+        """十神分析器（透干+藏干）"""
         if self._shishen is None:
             self._shishen = ShishenAnalyzer(self)
         return self._shishen
+
+    @property
+    def shensha(self):
+        """神煞分析器"""
+        if self._shensha is None:
+            self._shensha = ShenShaAnalyzer(self)
+        return self._shensha
+
+    @property
+    def geju(self):
+        """格局分析器"""
+        if self._geju is None:
+            self._geju = GejuAnalyzer(self)
+        return self._geju
+
+    # ========== 基础盘数据 ==========
+    @property
+    def cang_gan(self):
+        """四柱地支藏干"""
+        return {
+            '年支': self.ec.getYearHideGan(),
+            '月支': self.ec.getMonthHideGan(),
+            '日支': self.ec.getDayHideGan(),
+            '时支': self.ec.getTimeHideGan(),
+        }
+
+    @property
+    def xun_kong(self):
+        """空亡（旬空）"""
+        return {
+            '日柱旬空': self.ec.getDayXunKong(),
+            '年柱旬空': self.ec.getYearXunKong(),
+        }
+
+    @property
+    def na_yin(self):
+        """四柱纳音"""
+        return {
+            '年柱': self.ec.getYearNaYin(),
+            '月柱': self.ec.getMonthNaYin(),
+            '日柱': self.ec.getDayNaYin(),
+            '时柱': self.ec.getTimeNaYin(),
+        }
+
+    @property
+    def shi_er_chang_sheng(self):
+        """十二长生（日干在地支状态）"""
+        return {
+            '年支': self.ec.getYearDiShi(),
+            '月支': self.ec.getMonthDiShi(),
+            '日支': self.ec.getDayDiShi(),
+            '时支': self.ec.getTimeDiShi(),
+        }
+
+    @property
+    def tai_yuan(self):
+        return {'干支': self.ec.getTaiYuan(), '纳音': self.ec.getTaiYuanNaYin()}
+
+    @property
+    def ming_gong(self):
+        return {'干支': self.ec.getMingGong(), '纳音': self.ec.getMingGongNaYin()}
+
+    @property
+    def shen_gong(self):
+        return {'干支': self.ec.getShenGong(), '纳音': self.ec.getShenGongNaYin()}
+
+    @property
+    def wuxing_ganzhi(self):
+        """每柱 天干五行+地支本气五行（如 土土/水土/水木/木木）"""
+        return self.lunar.getBaZiWuXing()
+
+    # ========== 大运 / 流年 ==========
+    @property
+    def yun(self):
+        """大运数据：顺逆/起运/每步大运(含流年)"""
+        if self._yun_data is not None:
+            return self._yun_data
+
+        yun = self.ec.getYun(self.gender_num)
+        da_yun = []
+        for dy in yun.getDaYun():
+            gz = dy.getGanZhi()
+            if not gz:
+                # lunar-python 首条为"起运前"占位（干支为空），跳过
+                continue
+            liu_nian = [
+                {'year': ln.getYear(), 'ganzhi': ln.getGanZhi(), 'age': ln.getAge()}
+                for ln in dy.getLiuNian()
+            ]
+            da_yun.append({
+                'ganzhi': gz,
+                'start_year': dy.getStartYear(),
+                'end_year': dy.getEndYear(),
+                'start_age': dy.getStartAge(),
+                'liu_nian': liu_nian,
+            })
+
+        self._yun_data = {
+            'forward': yun.isForward(),
+            'start_age_year': yun.getStartYear(),
+            'start_age_month': yun.getStartMonth(),
+            'start_age_day': yun.getStartDay(),
+            'start_solar': yun.getStartSolar().toYmd() if yun.getStartSolar() else None,
+            'da_yun': da_yun,
+        }
+        return self._yun_data
+
+    def liu_nian_of(self, year: int):
+        """查询指定公历年份的流年干支（从大运结构中查找）"""
+        for dy in self.yun['da_yun']:
+            for ln in dy['liu_nian']:
+                if ln['year'] == year:
+                    return ln['ganzhi']
+        return None
+
+    def recent_liu_nian(self, num=10, end_year=None):
+        """近 N 年流年列表 [{year, ganzhi, age}]（按公历年份倒序）"""
+        end_year = end_year or datetime.now().year
+        result = []
+        for y in range(end_year - num + 1, end_year + 1):
+            gz = self.liu_nian_of(y)
+            if gz:
+                result.append({'year': y, 'ganzhi': gz})
+        return result
+
+    def ganzhi_relation(self, ganzhi: str):
+        """计算某干支对日主的五行与十神关系（大运/流年详批用）。
+
+        返回 {天干, 天干五行, 天干十神, 地支, 地支五行, 藏干十神:[(藏干,五行,十神)]}
+        """
+        gan, zhi = ganzhi[0], ganzhi[1]
+        zhi_hidden = []
+        for hidden_gan, _wx in ZHI_CANGGAN.get(zhi, []):
+            zhi_hidden.append({
+                '藏干': hidden_gan,
+                '五行': GAN_WUXING[hidden_gan],
+                '十神': self.shishen.get_relationship(hidden_gan),
+            })
+        return {
+            '天干': gan,
+            '天干五行': GAN_WUXING[gan],
+            '天干十神': self.shishen.get_relationship(gan),
+            '地支': zhi,
+            '地支五行': GAN_WUXING[zhi] if zhi in GAN_WUXING else None,
+            '藏干十神': zhi_hidden,
+        }
+
+    def da_yun_with_relation(self):
+        """大运数据 + 每步大运对日主的十神/五行关系（供 LLM 详批）"""
+        result = []
+        for dy in self.yun['da_yun']:
+            entry = dict(dy)
+            entry['relation'] = self.ganzhi_relation(dy['ganzhi'])
+            result.append(entry)
+        return result
+
+    # ========== 汇总 ==========
+    def base_dict(self):
+        """基础盘 + 进阶盘数据（确定性计算层，不含 LLM）"""
+        return {
+            '出生信息': {
+                '公历': f"{self.year}-{self.month}-{self.day} {self.hour:02d}:{self.minute:02d}",
+                '性别': '男' if self.gender == 'male' else '女',
+                '出生地经度': self.longitude,
+                '真太阳时': f"{self.true_hour:02d}:{self.true_minute:02d}"
+                            if self.longitude is not None else None,
+            },
+            '四柱': {
+                '年柱': f"{self.nian_gan}{self.nian_zhi}",
+                '月柱': f"{self.yue_gan}{self.yue_zhi}",
+                '日柱': f"{self.ri_gan}{self.ri_zhi}",
+                '时柱': f"{self.shi_gan}{self.shi_zhi}",
+            },
+            '日主': self.rizhu,
+            '藏干': self.cang_gan,
+            '空亡': self.xun_kong,
+            '纳音': self.na_yin,
+            '十二长生': self.shi_er_chang_sheng,
+            '十神(透干)': self.shishen.all_tiangan(),
+            '十神(藏干)': self.shishen.all_dizhi(),
+            '胎元': self.tai_yuan,
+            '命宫': self.ming_gong,
+            '身宫': self.shen_gong,
+            '五行分布': self.wuxing.count(),
+            '日主强弱': self.wuxing.day_master_strength(),
+            '喜用神': self.wuxing.xiyong_shen(),
+            '格局': self.geju.get_geju(),
+            '神煞': self.shensha.summary(),
+            '大运': {
+                '顺逆': '顺行' if self.yun['forward'] else '逆行',
+                '起运': f"{self.yun['start_age_year']}岁{self.yun['start_age_month']}个月"
+                        f"{self.yun['start_age_day']}天",
+                '起运公历': self.yun['start_solar'],
+                '大运列表': [
+                    {
+                        '干支': dy['ganzhi'],
+                        '起止': f"{dy['start_year']}-{dy['end_year']}",
+                        '年龄': f"{dy['start_age']}岁",
+                        '五行': self.ganzhi_relation(dy['ganzhi'])['天干五行'],
+                        '十神': self.ganzhi_relation(dy['ganzhi'])['天干十神'],
+                    }
+                    for dy in self.yun['da_yun']
+                ],
+            },
+            '近10年流年': [
+                {'year': ln['year'], 'ganzhi': ln['ganzhi'],
+                 '五行': self.ganzhi_relation(ln['ganzhi'])['天干五行'],
+                 '十神': self.ganzhi_relation(ln['ganzhi'])['天干十神']}
+                for ln in self.recent_liu_nian()
+            ],
+        }
+
+    def to_dict(self):
+        """完整排盘数据（base_dict + 调式推荐）"""
+        data = self.base_dict()
+        rec = self.wuxing.recommend_yinyue()
+        data['推荐调式'] = {
+            '主调': rec['primary_mode'],
+            '主调五行': rec['primary_wuxing'],
+            '辅调': rec['secondary_mode'],
+            '辅调五行': rec['secondary_wuxing'],
+        }
+        return data
 
     def recommend_mode(self):
         """根据五行分析推荐五音调式"""

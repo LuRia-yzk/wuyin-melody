@@ -5,3 +5,5 @@ langgraph>=0.2
 langchain-core>=0.3
 python-dotenv>=1.0
 pytest>=7.0
+lunar-python>=1.4.8
+music21>=10.0

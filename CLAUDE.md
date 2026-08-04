@@ -22,46 +22,50 @@ python agents/workflow.py
 ## 架构
 
 ```
-用户输入出生时间
+用户输入出生时间(+出生地经度可选)
     ↓
 [LangGraph工作流 - agents/workflow.py]
-    ├── 节点1 analyze_bazi   Python引擎精确排盘（bazi/）
-    ├── 节点2 analyze_fate   DeepSeek命理分析师解读（agents/fate_analyst.py）
-    ├── 节点3 generate_melody DeepSeek创作五音旋律（agents/melody_agent.py）
-    └── 节点4 render_music   MIDI生成 + FluidSynth渲染WAV（music/）
+    ├── 节点1 analyze_bazi   lunar-python精确排盘 + 自研命理层（bazi/）
+    ├── 节点2 analyze_fate   DeepSeek完整命理报告 + 流年详批（agents/fate_analyst.py）
+    ├── 节点3 generate_melody DeepSeek创作ABC乐谱（agents/melody_agent.py）
+    └── 节点4 render_music   ABC→MIDI→FluidSynth渲染WAV（music/）
 ```
 
-- 八字计算用确定性公式（精确、可验证），不用LLM
-- 命理分析和旋律创作用LLM（有洞察力、有创意）
-- LLM不可用时自动降级（默认解读/默认旋律）
+- 天文计算（节气/立春/大运/流年/纳音/胎元命宫）用 lunar-python 底座，保证排盘精确不出错
+- 命理判断（喜用神/格局/神煞/调式）自研，命理报告和乐谱创作用LLM
+- LLM不可用时自动降级（规则解读/默认乐谱）
 
 ## 模块结构
 
 | 模块 | 文件 | 作用 |
 |------|------|------|
-| bazi/constants.py | 天干地支、五行、五虎遁、五鼠遁常量 | 排盘基础数据 |
-| bazi/bazi_engine.py | BaZiEngine类 | 四柱排盘（年/月/日/时） |
-| bazi/wuxing.py | WuxingAnalyzer类 | 五行强弱分析 → 推荐调式 |
-| bazi/shishen.py | ShishenAnalyzer类 | 十神关系 |
-| music/melody.py | MelodyGenerator类 + PENTATONIC_SCALES | 五音调式音阶、MIDI生成 |
+| bazi/constants.py | 天干地支、五行、五虎遁、五鼠遁常量 | 命理分析基础数据 |
+| bazi/bazi_engine.py | BaZiChart类（包装lunar-python） | 完整排盘：四柱/藏干/纳音/空亡/十二长生/十神/胎元命宫身宫/大运流年 + 真太阳时 |
+| bazi/shensha.py | ShenShaAnalyzer类 | 神煞查表（天乙/文昌/桃花/驿马等~12种） |
+| bazi/wuxing.py | WuxingAnalyzer类 | 五行强弱、喜用神（扶抑+调候）、推荐调式 |
+| bazi/geju.py | GejuAnalyzer类 | 简单格局判定（月支藏干本气取格） |
+| bazi/shishen.py | ShishenAnalyzer类 | 十神关系（透干+藏干） |
+| music/melody.py | MelodyGenerator类 + PENTATONIC_SCALES/WUYIN_ABC_SCALES | 五音调式音阶、MIDI生成、ABC音名映射 |
+| music/abc_render.py | abc_to_midi()/render_abc_to_wav() | ABC乐谱→MIDI(music21)→WAV |
 | music/render.py | render_midi_to_wav() | FluidSynth 将 MIDI 渲染为 WAV |
 | agents/workflow.py | build_workflow() | LangGraph四节点工作流（输出 MIDI+WAV） |
-| agents/melody_agent.py | generate_melody_with_llm() | DeepSeek创作旋律 |
-| agents/fate_analyst.py | analyze_fate_with_llm() | DeepSeek命理分析师解读 |
+| agents/melody_agent.py | generate_melody_with_llm() | DeepSeek创作ABC乐谱（白名单语法+校验重试+降级） |
+| agents/fate_analyst.py | analyze_fate_with_llm() | DeepSeek完整命理报告 + 流年详批 |
 | cli.py | main() | 命令行交互界面 |
 
-## 当前状态（2026-08-01）
+## 当前状态（2026-08-04）
 
-- ✅ 八字引擎完成，验证通过（基准：1988-10-15男命 → 戊辰 壬戌 癸卯 乙卯）
-- ✅ 五行分析 + 十神完成
-- ✅ 五音调式MIDI生成器完成（generate + generate_from_notes 两模式）
-- ✅ LangGraph四节点工作流跑通（八字→命理→旋律→渲染）
-- ✅ 命理分析师 LLM 解读完成（agents/fate_analyst.py）
-- ✅ SoundFont渲染管线跑通（FluidSynth 2.5.7 + music/render.py，输出 WAV）
-- ✅ CLI交互界面完成（cli.py）
+- ✅ 排盘底座升级 lunar-python（修复三处误差：年柱立春边界/月柱节气时刻/真太阳时）
+- ✅ 完整排盘：四柱/藏干/纳音/空亡/十二长生/十神/胎元命宫身宫/大运/流年/神煞/格局
+- ✅ 五行分析 + 喜用神（扶抑+调候）+ 十神 + 调式推荐
+- ✅ 完整命理报告 + 流年详批（DeepSeek，fate_analyst.py）
+- ✅ ABC 乐谱生成管线（LLM 生成 ABC → music21 → FluidSynth → WAV）
+- ✅ LangGraph四节点工作流跑通（排盘→命理→乐谱→渲染）
+- ✅ CLI交互界面完成（cli.py，支持 --minute/--longitude）
+- ✅ 41 个 pytest 全部通过
 - ⬜ 古琴音色待替换（当前用测试音色 VintageDreamsWaves，需注册下载 SPC700）
 - ⬜ GitHub远程部署
-- ⬜ 五行数据差异待复核（见 docs/progress.md）
+- ⬜ 音乐品质打磨（旋律模板/节奏变化/多轨编曲）
 
 ## 关键决策记录
 
