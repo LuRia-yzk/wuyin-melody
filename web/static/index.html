@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老祖宗的 MBTI · 八字性格测试</title>
+<link rel="stylesheet" href="/static/style.css?v=6">
+</head>
+<body>
+<div class="container">
+
+  <!-- ========== 板块1：输入 ========== -->
+  <section id="section-input" class="section">
+    <div class="hero">
+      <div class="hero-badge">五行 · 十神 · 格局</div>
+      <h1 class="hero-title">老祖宗的<span class="accent"> MBTI</span></h1>
+      <p class="hero-sub">两千年前的《黄帝内经》把人的性格分为 25 种。<br>输入你的生辰，看看你是哪一种。</p>
+    </div>
+
+    <form id="birth-form" class="birth-form">
+      <div class="field-row">
+        <div class="field">
+          <label>出生年</label>
+          <input type="number" id="f-year" min="1930" max="2025" value="1995" required>
+        </div>
+        <div class="field">
+          <label>月</label>
+          <input type="number" id="f-month" min="1" max="12" value="8" required>
+        </div>
+        <div class="field">
+          <label>日</label>
+          <input type="number" id="f-day" min="1" max="31" value="3" required>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>时辰（0-23 时）</label>
+          <input type="number" id="f-hour" min="0" max="23" value="10" required>
+        </div>
+        <div class="field">
+          <label>分钟</label>
+          <input type="number" id="f-minute" min="0" max="59" value="0">
+        </div>
+        <div class="field">
+          <label>性别</label>
+          <select id="f-gender">
+            <option value="male">男</option>
+            <option value="female">女</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="btn-submit">排 盘</button>
+      <div id="form-error" class="form-error hidden"></div>
+    </form>
+  </section>
+
+  <!-- ========== 板块2：排盘揭晓 ========== -->
+  <section id="section-bazi" class="section hidden">
+    <button id="btn-back-input" class="btn-back">← 返回修改</button>
+    <div class="bazi-panel">
+      <div class="bazi-title">八 字 排 盘</div>
+      <div id="bazi-grid" class="bazi-grid"></div>
+      <div id="bazi-summary" class="bazi-summary"></div>
+      <div id="bazi-three" class="bazi-three"></div>
+      <div id="bazi-shensha" class="bazi-shensha"></div>
+      <div id="bazi-dayun" class="bazi-dayun"></div>
+      <button id="btn-copy-bazi" class="btn-copy">复制排盘信息</button>
+    </div>
+
+    <div class="type-reveal">
+      <div class="reveal-label">命格性格类型</div>
+      <div id="type-code" class="type-code"></div>
+      <h2 id="type-name" class="type-name"></h2>
+      <div id="type-tag" class="type-tag"></div>
+      <p id="type-slogan" class="type-slogan"></p>
+      <div id="type-tags" class="type-tags"></div>
+    </div>
+
+    <button id="btn-analyze" class="btn-primary">开始性格分析</button>
+  </section>
+
+  <!-- ========== 板块3：分析结果 ========== -->
+  <section id="section-result" class="section hidden">
+    <button id="btn-back-bazi" class="btn-back">← 返回排盘</button>
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <p>老祖宗正在翻你的命书……<br><small>（AI 性格分析约需 10-30 秒）</small></p>
+    </div>
+
+    <div id="report" class="report"></div>
+
+    <div class="card-section">
+      <h3>把你的性格卡分享出去</h3>
+      <div id="share-card" class="share-card"></div>
+      <p class="share-hint">长按 / 截图保存，分享给朋友看看 TA 是哪一种</p>
+      <button id="btn-copy-bazi-result" class="btn-copy">复制性格类型</button>
+    </div>
+
+    <button id="btn-retest" class="btn-secondary">再测一次</button>
+  </section>
+
+</div>
+<script src="/static/app.js?v=6"></script>
+</body>
+</html>

@@ -229,13 +229,36 @@ class TestShenSha:
 
 
 class TestGeju:
-    """格局测试"""
+    """格局测试（增强版：月令 + 透干成格）"""
 
     def test_benchmark_geju(self):
-        """基准命局：月支戌本气戊（正官）→ 正官格"""
+        """基准命局：月支戌藏戊（正官）透于年干 → 正官格"""
         bazi = BaZiChart(1988, 10, 15, 6, gender='male')
         geju = bazi.geju.get_geju()
         assert geju['格名'] == '正官格'
+        assert '透于天干' in geju['说明']
+
+    def test_tougan_chenggge(self):
+        """透干成格：甲日主寅月，中气丙（食神）透时干 → 食神格
+        （旧版取寅本气甲=比肩会误判为建禄格，增强后正确取透干中气）"""
+        bazi = BaZiChart(1982, 2, 20, 3, gender='male')
+        geju = bazi.geju.get_geju()
+        assert bazi.ri_gan == '甲' and bazi.yue_zhi == '寅'
+        assert geju['格名'] == '食神格'
+        assert '透于天干' in geju['说明']
+
+    def test_jianlu_ge(self):
+        """无透干成格：乙日主卯月（本气乙=比肩）→ 建禄格"""
+        bazi = BaZiChart(1980, 3, 13, 20, gender='male')
+        geju = bazi.geju.get_geju()
+        assert bazi.ri_gan == '乙' and bazi.yue_zhi == '卯'
+        assert geju['格名'] == '建禄格'
+
+    def test_geju_deterministic(self):
+        """同输入同格局"""
+        g1 = BaZiChart(1988, 10, 15, 6, gender='male').geju.get_geju()
+        g2 = BaZiChart(1988, 10, 15, 6, gender='male').geju.get_geju()
+        assert g1 == g2
 
 
 class TestDaYun:

@@ -1,0 +1,349 @@
+/* ===== 老祖宗的 MBTI · 新中式 ===== */
+:root {
+  --bg: #f5f0e6;
+  --paper: #fbf8f1;
+  --ink: #2c2a26;
+  --ink-soft: #6b655a;
+  --line: #ddd5c5;
+  --accent: #1f618d;
+  --accent-soft: rgba(31, 97, 141, 0.1);
+  --gold: #b8860b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+.hidden { display: none !important; }
+
+.section { animation: fadeUp 0.5s ease; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== 板块1 输入 ===== */
+.hero { text-align: center; margin: 8px 0 28px; }
+.hero-badge {
+  display: inline-block; font-size: 12px; letter-spacing: 2px;
+  color: var(--gold); border: 1px solid var(--gold);
+  padding: 4px 14px; border-radius: 999px; margin-bottom: 16px;
+}
+.hero-title {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: 42px; font-weight: 700; letter-spacing: 2px;
+}
+.hero-title .accent { color: var(--accent); }
+.hero-sub { color: var(--ink-soft); font-size: 14px; margin-top: 12px; }
+
+.birth-form {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px 20px;
+  box-shadow: 0 6px 24px rgba(60, 50, 30, 0.06);
+}
+.field-row { display: flex; gap: 12px; margin-bottom: 16px; }
+.field { flex: 1; }
+.field.wide { flex: 2; }
+.field label { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 6px; }
+.field input, .field select {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: #fff; font-size: 15px; color: var(--ink);
+  outline: none; transition: border-color 0.2s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field-last { margin-bottom: 20px; }
+
+.btn-primary, .btn-secondary {
+  width: 100%; padding: 14px;
+  border: none; border-radius: 12px;
+  font-size: 16px; letter-spacing: 3px; cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+}
+.btn-primary {
+  background: var(--ink); color: #fff;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.5; cursor: wait; }
+.btn-secondary {
+  background: transparent; color: var(--ink-soft);
+  border: 1px solid var(--line); margin-top: 12px;
+}
+.btn-secondary:hover { border-color: var(--ink-soft); }
+
+.form-error {
+  margin-top: 14px; text-align: center;
+  color: #b03030; font-size: 13px;
+}
+
+/* 返回按钮 */
+.btn-back {
+  display: inline-block;
+  border: none; background: transparent;
+  color: var(--ink-soft); font-size: 13px;
+  cursor: pointer; padding: 4px 6px; margin: -4px 0 12px;
+  letter-spacing: 1px;
+}
+.btn-back:hover { color: var(--accent); }
+
+/* 复制排盘信息 */
+.btn-copy {
+  display: block; margin: 16px auto 0;
+  border: 1px solid var(--line); background: #fff;
+  color: var(--ink-soft); font-size: 13px;
+  padding: 8px 20px; border-radius: 999px;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ===== 板块2 排盘揭晓 ===== */
+.bazi-panel {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.bazi-title {
+  font-size: 12px; color: var(--ink-soft);
+  letter-spacing: 3px; margin-bottom: 14px;
+}
+
+/* 四柱盘表格 */
+.bazi-grid {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  font-family: "Songti SC", "STSong", serif;
+}
+.gr { display: grid; grid-template-columns: 56px 1fr 1fr 1fr 1fr; }
+.gr + .gr { border-top: 1px solid var(--line); }
+.gl, .gc {
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.gl {
+  background: var(--accent-soft);
+  color: var(--ink-soft);
+  font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+}
+.gc { border-left: 1px solid var(--line); }
+.gr-head .gc {
+  font-size: 12px; color: var(--gold);
+  background: rgba(184, 134, 11, 0.06);
+}
+.gc.hi {
+  /* 整列日柱：微弱底色高亮（不覆盖五行文字色） */
+  background: rgba(0, 0, 0, 0.035);
+}
+.gc.dm {
+  /* 日主天干：加粗放大，五行色保留 */
+  font-weight: 700;
+  font-size: 17px;
+}
+
+/* 命理摘要 */
+.bazi-summary { margin-top: 14px; text-align: center; }
+.sum-line { margin: 4px 0; }
+.sum-line .tag {
+  display: inline-block; background: var(--accent-soft);
+  color: var(--accent); border-radius: 6px;
+  padding: 3px 10px; margin: 3px; font-size: 12px;
+}
+.wuxing-line { color: var(--ink-soft); font-size: 13px; }
+
+/* 胎元命宫身宫 */
+.bazi-three {
+  display: flex; justify-content: space-around;
+  margin-top: 14px; padding: 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 10px;
+  text-align: center;
+}
+.three-item { font-size: 13px; color: var(--ink-soft); }
+.three-item b {
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 15px; color: var(--ink); margin: 0 4px;
+}
+
+/* 神煞 / 大运 小节标题 */
+.sub-title {
+  font-size: 12px; color: var(--gold);
+  letter-spacing: 3px; margin: 16px 0 8px;
+  text-align: left;
+}
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-list .tag {
+  font-size: 12px; color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* 大运 */
+.dy-meta { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
+.dy-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.dy-item {
+  font-size: 12px; color: var(--ink);
+  background: #fff; border: 1px solid var(--line);
+  border-radius: 8px; padding: 4px 10px;
+}
+.dy-item b {
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 14px; color: var(--accent);
+}
+.ln-list { font-size: 13px; color: var(--ink-soft); line-height: 1.9; }
+
+.type-reveal {
+  text-align: center;
+  padding: 12px 0 20px;
+}
+.reveal-label {
+  font-size: 12px; color: var(--gold);
+  letter-spacing: 4px; margin-bottom: 8px;
+}
+.type-code {
+  display: inline-block;
+  font-size: 12px; letter-spacing: 2px;
+  background: var(--ink); color: #fff;
+  padding: 3px 14px; border-radius: 999px;
+}
+.type-name {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: 44px; font-weight: 700; margin: 14px 0 4px;
+  color: var(--accent);
+}
+.type-tag { font-size: 15px; color: var(--ink-soft); }
+.type-slogan {
+  margin: 16px auto 14px; max-width: 380px;
+  font-size: 14px; color: var(--ink);
+  font-family: "Songti SC", "STSong", serif;
+  line-height: 1.9;
+}
+.type-tags { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.type-tags .tag {
+  font-size: 12px; color: var(--ink-soft);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px 12px;
+}
+
+/* ===== 板块3 分析结果 ===== */
+.loading { text-align: center; padding: 40px 0; color: var(--ink-soft); }
+.loading p { margin-top: 16px; font-size: 15px; }
+.spinner {
+  width: 40px; height: 40px; margin: 0 auto;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.report {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px 20px;
+  margin-bottom: 24px;
+}
+.report .report-head { text-align: center; margin-bottom: 18px; }
+.report .report-head .r-name {
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 26px; font-weight: 700; color: var(--accent);
+}
+.report .report-head .r-tag { color: var(--ink-soft); font-size: 14px; }
+.report .r-section { margin-bottom: 16px; }
+.report .r-section h4 {
+  font-size: 13px; color: var(--gold); letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+.report .r-section p { font-size: 14px; line-height: 1.9; }
+.report .r-saying {
+  background: var(--accent-soft); border-radius: 10px;
+  padding: 14px; font-family: "Songti SC", "STSong", serif;
+  font-size: 14px; line-height: 1.9; color: var(--ink);
+}
+
+/* 维度条 */
+.dim-bar { margin: 8px 0; }
+.dim-bar .dim-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.dim-bar .dim-track {
+  height: 8px; background: #ece5d6; border-radius: 99px; overflow: hidden;
+}
+.dim-bar .dim-fill {
+  height: 100%; border-radius: 99px;
+  background: var(--accent); transition: width 0.8s ease;
+}
+
+/* ===== 分享卡（9:16 竖版） ===== */
+.card-section { text-align: center; margin-bottom: 24px; }
+.card-section h3 { font-size: 16px; margin-bottom: 14px; color: var(--ink); }
+
+.share-card {
+  width: 340px; margin: 0 auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(60, 50, 30, 0.14);
+  text-align: center;
+}
+.share-card .card-top {
+  background: var(--accent);
+  color: #fff; padding: 18px 0;
+  font-size: 13px; letter-spacing: 4px;
+}
+.share-card .card-body { padding: 28px 22px 22px; }
+.share-card .card-icon {
+  font-size: 40px; margin-bottom: 6px;
+}
+.share-card .card-code {
+  display: inline-block; font-size: 11px; letter-spacing: 2px;
+  background: var(--accent-soft); color: var(--accent);
+  padding: 3px 12px; border-radius: 999px; margin-bottom: 10px;
+}
+.share-card .card-name {
+  font-family: "Songti SC", "STSong", "Noto Serif SC", serif;
+  font-size: 38px; font-weight: 700; color: var(--accent);
+}
+.share-card .card-tag { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
+.share-card .card-slogan {
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 13px; line-height: 1.9; color: var(--ink);
+  margin: 16px auto; max-width: 280px;
+}
+.share-card .card-dims {
+  border-top: 1px dashed var(--line);
+  padding-top: 14px; margin-top: 14px;
+  text-align: left;
+}
+.share-card .card-dims .dim-label { font-size: 12px; }
+.share-card .card-saying {
+  margin-top: 14px; padding: 12px;
+  background: var(--accent-soft); border-radius: 10px;
+  font-family: "Songti SC", "STSong", serif;
+  font-size: 12px; line-height: 1.8; color: var(--ink);
+}
+.share-card .card-foot {
+  border-top: 1px solid var(--line);
+  padding: 12px; font-size: 11px; color: var(--ink-soft);
+}
+.share-hint { color: var(--ink-soft); font-size: 12px; margin-top: 12px; }
